@@ -1,12 +1,13 @@
 package io.cucumber.core.plugin;
 
-import gherkin.deps.com.google.gson.Gson;
-import gherkin.deps.com.google.gson.GsonBuilder;
-import gherkin.deps.com.google.gson.JsonDeserializer;
-import io.cucumber.plugin.event.Result;
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
 import io.cucumber.core.feature.CucumberFeature;
 import io.cucumber.core.feature.TestFeatureParser;
 import io.cucumber.core.runner.TestHelper;
+import io.cucumber.plugin.event.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -25,7 +25,6 @@ import java.util.Scanner;
 import static io.cucumber.core.runner.TestHelper.result;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.hamcrest.core.IsNull.notNullValue;
@@ -38,13 +37,6 @@ class TimelineFormatterTest {
     private static final String REPORT_TEMPLATE_RESOURCE_DIR = "src/main/resources/io/cucumber/core/plugin/timeline";
     private static final String REPORT_JS = "report.js";
     private static final Duration STEP_DURATION = Duration.ofMillis(1000);
-
-    private final Gson gson = new GsonBuilder().registerTypeAdapter(
-        Instant.class,
-        (JsonDeserializer<Instant>) (json, type, jsonDeserializationContext) ->
-            json.isJsonObject()
-                ? Instant.ofEpochSecond(json.getAsJsonObject().get("seconds").getAsLong())
-                : Instant.ofEpochMilli(json.getAsLong())).create();
 
     private final Map<String, Result> stepsToResult = new HashMap<>();
     private final Map<String, String> stepsToLocation = new HashMap<>();
@@ -137,19 +129,18 @@ class TimelineFormatterTest {
             .build()
             .run();
 
-        final TimelineFormatter.TestData[] expectedTests = getExpectedTestData(0L); // Have to ignore actual thread id and just check not null
+        final JsonValue expectedTests = getExpectedTestData(0L); // Have to ignore actual thread id and just check not null
 
         final ActualReportOutput actualOutput = readReport();
 
         //Cannot verify size / contents of Groups as multi threading not guaranteed in Travis CI
-        assertThat(actualOutput.groups, not(empty()));
+        assertThat(actualOutput.groups, not(equalTo(Json.array())));
         for (int i = 0; i < actualOutput.groups.size(); i++) {
-            final TimelineFormatter.GroupData actual = actualOutput.groups.get(i);
-
+            final JsonValue actual = actualOutput.groups.get(i);
             final int idx = i;
             assertAll("Checking TimelineFormatter.GroupData",
-                () -> assertThat(String.format("id on group %s, was not as expected", idx), actual.id > 0, is(equalTo(true))),
-                () -> assertThat(String.format("content on group %s, was not as expected", idx), actual.content, is(notNullValue()))
+                () -> assertThat(String.format("id on group %s, was not as expected", idx), actual.asObject().getInt("id", -1) > 0, is(equalTo(true))),
+                () -> assertThat(String.format("content on group %s, was not as expected", idx), actual.asObject().getString("content", null), is(notNullValue()))
             );
         }
 
@@ -167,9 +158,9 @@ class TimelineFormatterTest {
         final Long groupId = Thread.currentThread().getId();
         final String groupName = Thread.currentThread().toString();
 
-        final TimelineFormatter.TestData[] expectedTests = getExpectedTestData(groupId);
+        final JsonValue expectedTests = getExpectedTestData(groupId);
 
-        final TimelineFormatter.GroupData[] expectedGroups = gson.fromJson(
+        final JsonValue expectedGroups = Json.parse(
             ("[\n" +
                 "  {\n" +
                 "    \"id\": groupId,\n" +
@@ -177,8 +168,7 @@ class TimelineFormatterTest {
                 "  }\n" +
                 "]")
                 .replaceAll("groupId", groupId.toString())
-                .replaceAll("groupName", groupName)
-            , TimelineFormatter.GroupData[].class);
+                .replaceAll("groupName", groupName));
 
         final ActualReportOutput actualOutput = readReport();
 
@@ -191,7 +181,7 @@ class TimelineFormatterTest {
         );
     }
 
-    private TimelineFormatter.TestData[] getExpectedTestData(Long groupId) {
+    private JsonValue getExpectedTestData(Long groupId) {
         String expectedJson = ("[\n" +
             "  {\n" +
             "    \"id\": \"failing-feature;scenario-1\",\n" +
@@ -235,7 +225,7 @@ class TimelineFormatterTest {
             "  }\n" +
             "]").replaceAll("groupId", groupId.toString());
 
-        return gson.fromJson(expectedJson, TimelineFormatter.TestData[].class);
+        return Json.parse(expectedJson);
     }
 
     private void runFormatterWithPlugin() {
@@ -267,8 +257,8 @@ class TimelineFormatterTest {
         itemLines.append("]");
         groupLines.append("]");
 
-        final TimelineFormatter.TestData[] tests = gson.fromJson(itemLines.toString(), TimelineFormatter.TestData[].class);
-        final TimelineFormatter.GroupData[] groups = gson.fromJson(groupLines.toString(), TimelineFormatter.GroupData[].class);
+        final JsonValue tests = Json.parse(itemLines.toString());
+        final JsonValue groups = Json.parse(groupLines.toString());
         return new ActualReportOutput(tests, groups);
     }
 
@@ -279,32 +269,32 @@ class TimelineFormatterTest {
         return contents;
     }
 
-    private void assertTimelineTestDataIsAsExpected(final TimelineFormatter.TestData[] expectedTests,
-                                                    final List<TimelineFormatter.TestData> actualOutput,
+    private void assertTimelineTestDataIsAsExpected(final JsonArray expectedTests,
+                                                    final JsonArray actualOutput,
                                                     final boolean checkActualThreadData,
                                                     final boolean checkActualTimeStamps) {
-        assertThat("Number of tests was not as expected", actualOutput.size(), is(equalTo(expectedTests.length)));
-        for (int i = 0; i < expectedTests.length; i++) {
-            final TimelineFormatter.TestData expected = expectedTests[i];
-            final TimelineFormatter.TestData actual = actualOutput.get(i);
+        assertThat("Number of tests was not as expected", actualOutput.size(), is(equalTo(expectedTests.size())));
+        for (int i = 0; i < expectedTests.size(); i++) {
+            final JsonObject expected = expectedTests.get(i).asObject();
+            final JsonObject actual = actualOutput.get(i).asObject();
             final int idx = i;
 
             assertAll("Checking TimelineFormatter.TestData",
-                () -> assertThat(String.format("id on item %s, was not as expected", idx), actual.id, is(equalTo(expected.id))),
-                () -> assertThat(String.format("feature on item %s, was not as expected", idx), actual.feature, is(equalTo(expected.feature))),
-                () -> assertThat(String.format("className on item %s, was not as expected", idx), actual.className, is(equalTo(expected.className))),
-                () -> assertThat(String.format("content on item %s, was not as expected", idx), actual.content, is(equalTo(expected.content))),
-                () -> assertThat(String.format("tags on item %s, was not as expected", idx), actual.tags, is(equalTo(expected.tags))),
+                () -> assertThat(String.format("id on item %s, was not as expected", idx), actual.get("id"), is(equalTo(expected.get("id")))),
+                () -> assertThat(String.format("feature on item %s, was not as expected", idx), actual.get("feature"), is(equalTo(expected.get("feature")))),
+                () -> assertThat(String.format("className on item %s, was not as expected", idx), actual.get("className"), is(equalTo(expected.get("className")))),
+                () -> assertThat(String.format("content on item %s, was not as expected", idx), actual.get("content"), is(equalTo(expected.get("content")))),
+                () -> assertThat(String.format("tags on item %s, was not as expected", idx), actual.get("tags"), is(equalTo(expected.get("tags")))),
                 () -> {
                     if (checkActualTimeStamps) {
                         assertAll("Checking ActualTimeStamps",
-                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.startTime, is(equalTo(expected.startTime))),
-                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.endTime, is(equalTo(expected.endTime)))
+                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("startTime"), is(equalTo(expected.get("startTime")))),
+                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("endTime"), is(equalTo(expected.get("endTime"))))
                         );
                     } else {
                         assertAll("Checking TimeStamps",
-                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.startTime, is(notNullValue())),
-                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.endTime, is(notNullValue()))
+                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("startTime"), is(notNullValue())),
+                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("endTime"), is(notNullValue()))
                         );
                     }
                 },
@@ -336,12 +326,12 @@ class TimelineFormatterTest {
 
     private static class ActualReportOutput {
 
-        private final List<TimelineFormatter.TestData> tests;
-        private final List<TimelineFormatter.GroupData> groups;
+        private final JsonArray tests;
+        private final JsonArray groups;
 
-        ActualReportOutput(final TimelineFormatter.TestData[] tests, final TimelineFormatter.GroupData[] groups) {
-            this.tests = Arrays.asList(tests);
-            this.groups = Arrays.asList(groups);
+        ActualReportOutput(final JsonValue tests, final JsonValue groups) {
+            this.tests = (JsonArray) tests;
+            this.groups = (JsonArray) groups;
         }
     }
 

@@ -4,6 +4,7 @@ import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
+import com.eclipsesource.json.WriterConfig;
 import gherkin.ast.Background;
 import gherkin.ast.DataTable;
 import gherkin.ast.DocString;
@@ -426,7 +427,7 @@ public final class HTMLFormatter implements EventListener {
             if (comma) {
                 out.append(", ");
             }
-            out.append(arg.toString());
+            out.append(arg.toString(WriterConfig.PRETTY_PRINT));
             comma = true;
         }
         out.append(");").println();

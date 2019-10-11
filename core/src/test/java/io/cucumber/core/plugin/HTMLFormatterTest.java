@@ -143,14 +143,14 @@ class HTMLFormatterTest {
         assertJsFunctionCallSequence(asList("" +
                 "formatter.uri(\"file:path/test.feature\");\n", "" +
                 "formatter.feature({\n" +
-                "  \"description\": \"\",\n" +
+                "  \"keyword\": \"Feature\",\n" +
                 "  \"name\": \"feature name\",\n" +
-                "  \"keyword\": \"Feature\"\n" +
+                "  \"description\": \"\"\n" +
                 "});\n", "" +
                 "formatter.scenario({\n" +
-                "  \"description\": \"\",\n" +
                 "  \"keyword\": \"Scenario\",\n" +
-                "  \"name\": \"scenario name\"\n" +
+                "  \"name\": \"scenario name\",\n" +
+                "  \"description\": \"\"\n" +
                 "});\n", "" +
                 "formatter.step({\n" +
                 "  \"keyword\": \"Given \",\n" +

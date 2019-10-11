@@ -1,9 +1,8 @@
 package io.cucumber.core.plugin;
 
-import gherkin.deps.com.google.gson.Gson;
-import gherkin.deps.com.google.gson.GsonBuilder;
-import gherkin.deps.com.google.gson.JsonPrimitive;
-import gherkin.deps.com.google.gson.JsonSerializer;
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
 import io.cucumber.plugin.event.EventPublisher;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.Result;
@@ -55,24 +54,29 @@ public final class UsageFormatter implements Plugin, EventListener {
     }
 
     void finishReport() {
-        List<StepDefContainer> stepDefContainers = new ArrayList<>();
+        JsonArray stepDefContainers = Json.array();
         for (Map.Entry<String, List<StepContainer>> usageEntry : usageMap.entrySet()) {
-            StepDefContainer stepDefContainer = new StepDefContainer(
-                usageEntry.getKey(),
-                createStepContainers(usageEntry.getValue())
-            );
+            JsonObject stepDefContainer = Json.object();
+            stepDefContainer.add("source", usageEntry.getKey());
+            stepDefContainer.add("steps", createStepContainers(usageEntry.getValue()));
+
             stepDefContainers.add(stepDefContainer);
         }
-
-        gson().toJson(stepDefContainers, out);
+        out.append(stepDefContainers.toString());
         out.close();
     }
 
-    private List<StepContainer> createStepContainers(List<StepContainer> stepContainers) {
+    private JsonArray createStepContainers(List<StepContainer> stepContainers) {
         for (StepContainer stepContainer : stepContainers) {
             stepContainer.putAllAggregatedDurations(createAggregatedDurations(stepContainer));
         }
-        return stepContainers;
+
+        JsonArray stepContainerArray = Json.array();
+        for (StepContainer stepContainer : stepContainers) {
+            stepContainerArray.add(stepContainer.toJson());
+        }
+
+        return stepContainerArray;
     }
 
     private Map<String, Duration> createAggregatedDurations(StepContainer stepContainer) {
@@ -97,15 +101,10 @@ public final class UsageFormatter implements Plugin, EventListener {
         return rawDurations;
     }
 
-    private Gson gson() {
-        JsonSerializer<Duration> durationJsonSerializer = (duration, returnVal, jsonSerializationContext) ->
-            new JsonPrimitive((double) duration.getNano() / NANOS_PER_SECOND);
-
-        return new GsonBuilder()
-            .registerTypeAdapter(Duration.class, durationJsonSerializer)
-            .setPrettyPrinting()
-            .create();
+    private static double durationInSections(Duration duration) {
+        return (double) duration.getNano() / NANOS_PER_SECOND;
     }
+
 
     private void addUsageEntry(Result result, PickleStepTestStep testStep) {
         List<StepContainer> stepContainers = usageMap.computeIfAbsent(testStep.getPattern(), k -> new ArrayList<>());
@@ -159,34 +158,6 @@ public final class UsageFormatter implements Plugin, EventListener {
     }
 
     /**
-     * Container of Step Definitions (patterns)
-     */
-    static class StepDefContainer {
-        private final String source;
-        private final List<StepContainer> steps;
-
-        StepDefContainer(String source, List<StepContainer> steps) {
-            this.source = source;
-            this.steps = steps;
-        }
-
-        /**
-         * The StepDefinition (pattern)
-         */
-        public String getSource() {
-            return source;
-        }
-
-        /**
-         * A list of Steps
-         */
-        public List<StepContainer> getSteps() {
-            return steps;
-        }
-
-    }
-
-    /**
      * Container for usage-entries of steps
      */
     static class StepContainer {
@@ -202,18 +173,29 @@ public final class UsageFormatter implements Plugin, EventListener {
             return name;
         }
 
-        void putAllAggregatedDurations(Map<String, Duration> aggregatedDurations) {
-            this.aggregatedDurations.putAll(aggregatedDurations);
-        }
-
-        public Map<String, Duration> getAggregatedDurations() {
-            return aggregatedDurations;
-        }
-
         List<StepDuration> getDurations() {
             return durations;
         }
 
+        void putAllAggregatedDurations(Map<String, Duration> aggregatedDurations) {
+            this.aggregatedDurations.putAll(aggregatedDurations);
+        }
+
+        JsonObject toJson() {
+            JsonObject stepContainer = Json.object();
+            stepContainer.add("name", name);
+            JsonObject aggregatedDurations = Json.object();
+            for (Map.Entry<String, Duration> entry : this.aggregatedDurations.entrySet()) {
+                aggregatedDurations.add(entry.getKey(), durationInSections(entry.getValue()));
+            }
+            stepContainer.add("aggregatedDurations", aggregatedDurations);
+            JsonArray durations = Json.array();
+            for (StepDuration duration : this.durations) {
+                durations.add(duration.toJson());
+            }
+            stepContainer.add("durations", durations);
+            return stepContainer;
+        }
     }
 
     static class StepDuration {
@@ -231,6 +213,13 @@ public final class UsageFormatter implements Plugin, EventListener {
 
         public String getLocation() {
             return location;
+        }
+
+        JsonObject toJson() {
+            JsonObject duration = Json.object();
+            duration.add("duration", durationInSections(this.duration));
+            duration.add("location", this.location);
+            return duration;
         }
     }
 }

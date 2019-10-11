@@ -1,8 +1,8 @@
 package io.cucumber.core.plugin;
 
-import gherkin.deps.com.google.gson.Gson;
-import gherkin.deps.com.google.gson.GsonBuilder;
-import gherkin.deps.com.google.gson.annotations.SerializedName;
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.plugin.ConcurrentEventListener;
 import io.cucumber.plugin.event.EventPublisher;
@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.net.URL;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -90,13 +89,11 @@ public final class TimelineFormatter implements ConcurrentEventListener {
     }
 
     private void finishReport(final TestRunFinished event) {
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
         reportJs.append("$(document).ready(function() {");
         reportJs.println();
-        appendAsJsonToJs(gson, reportJs, "timelineItems", allTests.values());
+        appendAsJsonToJs(reportJs, "timelineItems", createTimeLineItems());
         reportJs.println();
-        //Need to sort groups by id, so can guarantee output of order in rendered timeline
-        appendAsJsonToJs(gson, reportJs, "timelineGroups", new TreeMap<>(allGroups).values());
+        appendAsJsonToJs(reportJs, "timelineGroups", createGroups());
         reportJs.println();
         reportJs.append("});");
         reportJs.close();
@@ -113,9 +110,27 @@ public final class TimelineFormatter implements ConcurrentEventListener {
 //            "****************************************\n");
     }
 
-    private void appendAsJsonToJs(final Gson gson, final NiceAppendable out, final String pushTo, final Collection<?> content) {
+    private JsonArray createGroups() {
+        JsonArray groups = Json.array();
+        //Need to sort groups by id, so can guarantee output of order in rendered timeline
+        for (GroupData value : new TreeMap<>(allGroups).values()) {
+            groups.add(value.toJson());
+        }
+        return groups;
+    }
+
+    private JsonArray createTimeLineItems() {
+        JsonArray line = Json.array();
+        for (TestData value : allTests.values()) {
+            JsonObject item = value.toJson();
+            line.add(item);
+        }
+        return line;
+    }
+
+    private void appendAsJsonToJs(final NiceAppendable out, final String pushTo, final JsonArray content) {
         out.append("CucumberHTML.").append(pushTo).append(".pushArray(");
-        gson.toJson(content, out);
+        out.append(content.toString());
         out.append(");");
     }
 
@@ -182,23 +197,14 @@ public final class TimelineFormatter implements ConcurrentEventListener {
     }
 
     class TestData {
-        @SerializedName("id")
         final String id;
-        @SerializedName("feature")
         final String feature;
-        @SerializedName("scenario")
         final String scenario;
-        @SerializedName("start")
         final long startTime;
-        @SerializedName("end")
         long endTime;
-        @SerializedName("group")
         final long threadId;
-        @SerializedName("content")
         final String content = ""; //Replaced in JS file
-        @SerializedName("className")
         String className;
-        @SerializedName("tags")
         final String tags;
 
         TestData(final TestCaseStarted started, final Long threadId) {
@@ -224,17 +230,35 @@ public final class TimelineFormatter implements ConcurrentEventListener {
             this.endTime = event.getInstant().toEpochMilli();
             this.className = event.getResult().getStatus().name().toLowerCase(ROOT);
         }
+
+        private JsonObject toJson() {
+            JsonObject item = Json.object();
+            item.add("id", id);
+            item.add("feature", feature);
+            item.add("scenario", scenario);
+            item.add("start", startTime);
+            item.add("end", endTime);
+            item.add("group", content);
+            item.add("className", className);
+            item.add("tags", tags);
+            return item;
+        }
     }
 
     static class GroupData {
-        @SerializedName("id")
         final long id;
-        @SerializedName("content")
         final String content;
 
         GroupData(Thread thread) {
             id = thread.getId();
             content = thread.toString();
+        }
+
+        private JsonObject toJson() {
+            JsonObject group = Json.object();
+            group.add("id", id);
+            group.add("content", content);
+            return group;
         }
     }
 

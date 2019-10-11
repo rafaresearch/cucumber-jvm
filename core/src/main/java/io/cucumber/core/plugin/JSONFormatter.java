@@ -1,9 +1,13 @@
 package io.cucumber.core.plugin;
 
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
 import gherkin.ast.Background;
 import gherkin.ast.Feature;
 import gherkin.ast.ScenarioDefinition;
 import gherkin.ast.Step;
+import gherkin.ast.Tag;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.Argument;
 import io.cucumber.plugin.event.DataTableArgument;
@@ -43,14 +47,13 @@ public final class JSONFormatter implements EventListener {
     private static final String before = "before";
     private static final String after = "after";
     private URI currentFeatureFile;
-    private final List<Map<String, Object>> featureMaps = new ArrayList<>();
+    private final JsonArray featureMaps = Json.array();
     private List<Map<String, Object>> currentElementsList;
     private Map<String, Object> currentElementMap;
     private Map<String, Object> currentTestCaseMap;
     private List<Map<String, Object>> currentStepsList;
     private Map<String, Object> currentStepOrHookMap;
     private final Map<String, Object> currentBeforeStepHookList = new HashMap<>();
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final NiceAppendable out;
     private final TestSourcesModel testSources = new TestSourcesModel();
 
@@ -78,7 +81,7 @@ public final class JSONFormatter implements EventListener {
     private void handleTestCaseStarted(TestCaseStarted event) {
         if (currentFeatureFile == null || !currentFeatureFile.equals(event.getTestCase().getUri())) {
             currentFeatureFile = event.getTestCase().getUri();
-            Map<String, Object> currentFeatureMap = createFeatureMap(event.getTestCase());
+            JsonObject currentFeatureMap = createFeatureMap(event.getTestCase());
             featureMaps.add(currentFeatureMap);
             currentElementsList = (List<Map<String, Object>>) currentFeatureMap.get("elements");
         }
@@ -131,25 +134,34 @@ public final class JSONFormatter implements EventListener {
     }
 
     private void finishReport() {
-        gson.toJson(featureMaps, out);
+        out.append(featureMaps.toString());
         out.close();
     }
 
-    private Map<String, Object> createFeatureMap(TestCase testCase) {
-        Map<String, Object> featureMap = new HashMap<>();
-        featureMap.put("uri", testCase.getUri());
-        featureMap.put("elements", new ArrayList<Map<String, Object>>());
+    private JsonObject createFeatureMap(TestCase testCase) {
+        JsonObject featureMap = Json.object();
+        featureMap.add("uri", testCase.getUri().toString());
+        featureMap.add("elements", Json.array());
         Feature feature = testSources.getFeature(testCase.getUri());
         if (feature != null) {
-            featureMap.put("keyword", feature.getKeyword());
-            featureMap.put("name", feature.getName());
-            featureMap.put("description", feature.getDescription() != null ? feature.getDescription() : "");
-            featureMap.put("line", feature.getLocation().getLine());
-            featureMap.put("id", TestSourcesModel.convertToId(feature.getName()));
-            featureMap.put("tags", feature.getTags());
-
+            featureMap.add("keyword", feature.getKeyword());
+            featureMap.add("name", feature.getName());
+            featureMap.add("description", feature.getDescription() != null ? feature.getDescription() : "");
+            featureMap.add("line", feature.getLocation().getLine());
+            featureMap.add("id", TestSourcesModel.convertToId(feature.getName()));
+            featureMap.add("tags", createTags(feature));
         }
         return featureMap;
+    }
+
+    private JsonArray createTags(Feature feature) {
+        JsonArray tags = Json.array();
+        for (Tag tag : feature.getTags()) {
+            JsonObject t = Json.object();
+            t.add("name", tag.getName());
+            tags.add(t);
+        }
+        return tags;
     }
 
     private Map<String, Object> createTestCase(TestCaseStarted event) {
