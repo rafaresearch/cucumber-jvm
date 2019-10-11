@@ -4,8 +4,6 @@ import gherkin.ast.Background;
 import gherkin.ast.Feature;
 import gherkin.ast.ScenarioDefinition;
 import gherkin.ast.Step;
-import gherkin.deps.com.google.gson.Gson;
-import gherkin.deps.com.google.gson.GsonBuilder;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.Argument;
 import io.cucumber.plugin.event.DataTableArgument;

@@ -1,6 +1,7 @@
 package io.cucumber.core.plugin;
 
-import gherkin.deps.com.google.gson.Gson;
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonValue;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -124,11 +125,10 @@ class URLOutputStream extends OutputStream {
     }
 
     class ResponseException extends IOException {
-        private final Gson gson = new Gson();
         private final int responseCode;
         private final String contentType;
 
-        public ResponseException(String responseBody, IOException cause, int responseCode, String contentType) {
+        ResponseException(String responseBody, IOException cause, int responseCode, String contentType) {
             super(responseBody, cause);
             this.responseCode = responseCode;
             this.contentType = contentType;
@@ -136,16 +136,18 @@ class URLOutputStream extends OutputStream {
 
         @Override
         public String getMessage() {
-            if (contentType.equals("application/json")) {
-                Map map = gson.fromJson(super.getMessage(), Map.class);
-                if (map.containsKey("error")) {
-                    return getMessage0(map.get("error").toString());
-                } else {
-                    return getMessage0(super.getMessage());
-                }
-            } else {
+            if (!contentType.equals("application/json")) {
                 return getMessage0(super.getMessage());
             }
+            JsonValue value = Json.parse(super.getMessage());
+            if (!value.isObject()) {
+                return getMessage0(super.getMessage());
+            }
+            JsonValue error = value.asObject().get("error");
+            if (error != null) {
+                return getMessage0(error.asString());
+            }
+            return getMessage0(super.getMessage());
         }
 
         private String getMessage0(String message) {

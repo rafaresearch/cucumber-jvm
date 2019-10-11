@@ -1,6 +1,6 @@
 package io.cucumber.core.plugin;
 
-import gherkin.deps.com.google.gson.JsonParser;
+import com.eclipsesource.json.Json;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.core.feature.CucumberFeature;
 import io.cucumber.core.feature.TestFeatureParser;
@@ -726,8 +726,7 @@ class HTMLFormatterTest {
         String expectedArgument = expectedMatcher.group(2);
         String actualArgumant = actualMatcher.group(2);
         if (matchUsingJson(expectedArgument, actualArgumant)) {
-            JsonParser parser = new JsonParser();
-            return parser.parse(expectedArgument).equals(parser.parse(actualArgumant));
+            return Json.parse(expectedArgument).equals(Json.parse(actualArgumant));
         } else {
             return expectedArgument.equals(actualArgumant);
         }
