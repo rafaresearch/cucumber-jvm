@@ -1230,6 +1230,7 @@ class JSONFormatterTest {
     private String runFeaturesWithFormatterInParallel(final List<String> featurePaths) throws IOException {
         final HookDefinition hook = mock(HookDefinition.class);
         when(hook.getTagExpression()).thenReturn("");
+        when(hook.getLocation()).thenReturn("mocked location");
         File report = File.createTempFile("cucumber-jvm-junit", ".json");
 
         final ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -1275,6 +1276,7 @@ class JSONFormatterTest {
     private String runFeaturesWithFormatter(final List<String> featurePaths) {
         final HookDefinition hook = mock(HookDefinition.class);
         when(hook.getTagExpression()).thenReturn("");
+        when(hook.getLocation()).thenReturn("mocked location");
         final ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         final ResourceLoader resourceLoader = TestClasspathResourceLoader.create(classLoader);
 

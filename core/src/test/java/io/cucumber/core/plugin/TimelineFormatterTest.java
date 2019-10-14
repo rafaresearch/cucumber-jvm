@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 class TimelineFormatterTest {
 
-    private static final Comparator<TimelineFormatter.TestData> TEST_DATA_COMPARATOR = Comparator.comparing(o -> o.id);
+    private static final Comparator<JsonObject> TEST_DATA_COMPARATOR = Comparator.comparing(o -> o.get("id").asString());
 
     private static final String REPORT_TEMPLATE_RESOURCE_DIR = "src/main/resources/io/cucumber/core/plugin/timeline";
     private static final String REPORT_JS = "report.js";
@@ -129,7 +130,7 @@ class TimelineFormatterTest {
             .build()
             .run();
 
-        final JsonValue expectedTests = getExpectedTestData(0L); // Have to ignore actual thread id and just check not null
+        final List<JsonObject> expectedTests = getExpectedTestData(0L); // Have to ignore actual thread id and just check not null
 
         final ActualReportOutput actualOutput = readReport();
 
@@ -158,17 +159,9 @@ class TimelineFormatterTest {
         final Long groupId = Thread.currentThread().getId();
         final String groupName = Thread.currentThread().toString();
 
-        final JsonValue expectedTests = getExpectedTestData(groupId);
+        final List<JsonObject> expectedTests = getExpectedTestData(groupId);
 
-        final JsonValue expectedGroups = Json.parse(
-            ("[\n" +
-                "  {\n" +
-                "    \"id\": groupId,\n" +
-                "    \"content\": \"groupName\"\n" +
-                "  }\n" +
-                "]")
-                .replaceAll("groupId", groupId.toString())
-                .replaceAll("groupName", groupName));
+        final List<JsonObject> expectedGroups = getExpectedGroups(groupId, groupName);
 
         final ActualReportOutput actualOutput = readReport();
 
@@ -181,7 +174,25 @@ class TimelineFormatterTest {
         );
     }
 
-    private JsonValue getExpectedTestData(Long groupId) {
+    private List<JsonObject> getExpectedGroups(Long groupId, String groupName) {
+        JsonValue expectedJson = Json.parse(
+            ("[\n" +
+                "  {\n" +
+                "    \"id\": groupId,\n" +
+                "    \"content\": \"groupName\"\n" +
+                "  }\n" +
+                "]")
+                .replaceAll("groupId", groupId.toString())
+                .replaceAll("groupName", groupName));
+
+        List<JsonObject> values = new ArrayList<>();
+        for (JsonValue jsonValue : expectedJson.asArray()) {
+            values.add((JsonObject) jsonValue);
+        }
+        return values;
+    }
+
+    private List<JsonObject> getExpectedTestData(Long groupId) {
         String expectedJson = ("[\n" +
             "  {\n" +
             "    \"id\": \"failing-feature;scenario-1\",\n" +
@@ -225,7 +236,11 @@ class TimelineFormatterTest {
             "  }\n" +
             "]").replaceAll("groupId", groupId.toString());
 
-        return Json.parse(expectedJson);
+        List<JsonObject> values = new ArrayList<>();
+        for (JsonValue jsonValue : Json.parse(expectedJson).asArray()) {
+            values.add((JsonObject) jsonValue);
+        }
+        return values;
     }
 
     private void runFormatterWithPlugin() {
@@ -269,14 +284,14 @@ class TimelineFormatterTest {
         return contents;
     }
 
-    private void assertTimelineTestDataIsAsExpected(final JsonArray expectedTests,
-                                                    final JsonArray actualOutput,
+    private void assertTimelineTestDataIsAsExpected(final List<JsonObject> expectedTests,
+                                                    final List<JsonObject>  actualOutput,
                                                     final boolean checkActualThreadData,
                                                     final boolean checkActualTimeStamps) {
         assertThat("Number of tests was not as expected", actualOutput.size(), is(equalTo(expectedTests.size())));
         for (int i = 0; i < expectedTests.size(); i++) {
-            final JsonObject expected = expectedTests.get(i).asObject();
-            final JsonObject actual = actualOutput.get(i).asObject();
+            final JsonObject expected = expectedTests.get(i);
+            final JsonObject actual = actualOutput.get(i);
             final int idx = i;
 
             assertAll("Checking TimelineFormatter.TestData",
@@ -288,50 +303,54 @@ class TimelineFormatterTest {
                 () -> {
                     if (checkActualTimeStamps) {
                         assertAll("Checking ActualTimeStamps",
-                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("startTime"), is(equalTo(expected.get("startTime")))),
-                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("endTime"), is(equalTo(expected.get("endTime"))))
+                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("start"), is(equalTo(expected.get("start")))),
+                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("end"), is(equalTo(expected.get("end"))))
                         );
                     } else {
                         assertAll("Checking TimeStamps",
-                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("startTime"), is(notNullValue())),
-                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("endTime"), is(notNullValue()))
+                            () -> assertThat(String.format("startTime on item %s, was not as expected", idx), actual.get("start"), is(notNullValue())),
+                            () -> assertThat(String.format("endTime on item %s, was not as expected", idx), actual.get("end"), is(notNullValue()))
                         );
                     }
                 },
                 () -> {
                     if (checkActualThreadData) {
-                        assertThat(String.format("threadId on item %s, was not as expected", idx), actual.threadId, is(equalTo(expected.threadId)));
+                        assertThat(String.format("threadId on item %s, was not as expected", idx), actual.get("group"), is(equalTo(expected.get("group"))));
                     } else {
-                        assertThat(String.format("threadId on item %s, was not as expected", idx), actual.threadId, is(notNullValue()));
+                        assertThat(String.format("threadId on item %s, was not as expected", idx), actual.get("group"), is(notNullValue()));
                     }
                 }
             );
         }
     }
 
-    private void assertTimelineGroupDataIsAsExpected(final TimelineFormatter.GroupData[] expectedGroups,
-                                                     final List<TimelineFormatter.GroupData> actualOutput) {
-        assertThat("Number of groups was not as expected", actualOutput.size(), is(equalTo(expectedGroups.length)));
-        for (int i = 0; i < expectedGroups.length; i++) {
-            final TimelineFormatter.GroupData expected = expectedGroups[i];
-            final TimelineFormatter.GroupData actual = actualOutput.get(i);
+    private void assertTimelineGroupDataIsAsExpected(final List<JsonObject> expectedGroups,
+                                                     final List<JsonObject> actualOutput) {
+        assertThat("Number of groups was not as expected", actualOutput.size(), is(equalTo(expectedGroups.size())));
+        for (int i = 0; i < expectedGroups.size(); i++) {
+            final JsonObject expected = expectedGroups.get(i);
+            final JsonObject actual = actualOutput.get(i);
 
             final int idx = i;
             assertAll("Checking TimelineFormatter.GroupData",
-                () -> assertThat(String.format("id on group %s, was not as expected", idx), actual.id, is(equalTo(expected.id))),
-                () -> assertThat(String.format("content on group %s, was not as expected", idx), actual.content, is(equalTo(expected.content)))
+                () -> assertThat(String.format("id on group %s, was not as expected", idx), actual.get("id"), is(equalTo(expected.get("id")))),
+                () -> assertThat(String.format("content on group %s, was not as expected", idx), actual.get("content"), is(equalTo(expected.get("content"))))
             );
         }
     }
 
     private static class ActualReportOutput {
 
-        private final JsonArray tests;
-        private final JsonArray groups;
+        private final List<JsonObject> tests = new ArrayList<>();
+        private final List<JsonObject> groups = new ArrayList<>();
 
         ActualReportOutput(final JsonValue tests, final JsonValue groups) {
-            this.tests = (JsonArray) tests;
-            this.groups = (JsonArray) groups;
+            for (JsonValue test : (JsonArray) tests) {
+                this.tests.add((JsonObject) test);
+            }
+            for (JsonValue group : (JsonArray) groups) {
+                this.groups.add((JsonObject) group);
+            }
         }
     }
 

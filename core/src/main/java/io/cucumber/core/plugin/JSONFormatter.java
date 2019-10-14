@@ -3,6 +3,7 @@ package io.cucumber.core.plugin;
 import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.WriterConfig;
 import gherkin.ast.Background;
 import gherkin.ast.Feature;
 import gherkin.ast.ScenarioDefinition;
@@ -35,31 +36,35 @@ import java.net.URI;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static java.util.Locale.ROOT;
 
 public final class JSONFormatter implements EventListener {
     private static final String before = "before";
     private static final String after = "after";
-    private URI currentFeatureFile;
     private final JsonArray featureMaps = Json.array();
-    private List<Map<String, Object>> currentElementsList;
-    private Map<String, Object> currentElementMap;
-    private Map<String, Object> currentTestCaseMap;
-    private List<Map<String, Object>> currentStepsList;
-    private Map<String, Object> currentStepOrHookMap;
-    private final Map<String, Object> currentBeforeStepHookList = new HashMap<>();
     private final NiceAppendable out;
     private final TestSourcesModel testSources = new TestSourcesModel();
+    private URI currentFeatureFile;
+    private JsonArray currentElementsList;
+    private JsonObject currentElementMap;
+    private JsonObject currentTestCaseMap;
+    private JsonArray currentStepsList;
+    private JsonObject currentStepOrHookMap;
+    private JsonObject currentBeforeStepHookList = Json.object();
 
     @SuppressWarnings("WeakerAccess") // Used by PluginFactory
     public JSONFormatter(Appendable out) {
         this.out = new NiceAppendable(out);
+    }
+
+    private static String printStackTrace(Throwable error) {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        error.printStackTrace(printWriter);
+        return stringWriter.toString();
     }
 
     @Override
@@ -77,13 +82,12 @@ public final class JSONFormatter implements EventListener {
         testSources.addTestSourceReadEvent(event.getUri(), event);
     }
 
-    @SuppressWarnings("unchecked")
     private void handleTestCaseStarted(TestCaseStarted event) {
         if (currentFeatureFile == null || !currentFeatureFile.equals(event.getTestCase().getUri())) {
             currentFeatureFile = event.getTestCase().getUri();
             JsonObject currentFeatureMap = createFeatureMap(event.getTestCase());
             featureMaps.add(currentFeatureMap);
-            currentElementsList = (List<Map<String, Object>>) currentFeatureMap.get("elements");
+            currentElementsList = currentFeatureMap.get("elements").asArray();
         }
         currentTestCaseMap = createTestCase(event);
         if (testSources.hasBackground(currentFeatureFile, event.getTestCase().getLine())) {
@@ -93,22 +97,21 @@ public final class JSONFormatter implements EventListener {
             currentElementMap = currentTestCaseMap;
         }
         currentElementsList.add(currentTestCaseMap);
-        currentStepsList = (List<Map<String, Object>>) currentElementMap.get("steps");
+        currentStepsList = currentElementMap.get("steps").asArray();
     }
 
-    @SuppressWarnings("unchecked")
     private void handleTestStepStarted(TestStepStarted event) {
         if (event.getTestStep() instanceof PickleStepTestStep) {
             PickleStepTestStep testStep = (PickleStepTestStep) event.getTestStep();
             if (isFirstStepAfterBackground(testStep)) {
                 currentElementMap = currentTestCaseMap;
-                currentStepsList = (List<Map<String, Object>>) currentElementMap.get("steps");
+                currentStepsList = currentElementMap.get("steps").asArray();
             }
             currentStepOrHookMap = createTestStep(testStep);
             //add beforeSteps list to current step
-            if (currentBeforeStepHookList.containsKey(before)) {
-                currentStepOrHookMap.put(before, currentBeforeStepHookList.get(before));
-                currentBeforeStepHookList.clear();
+            if (currentBeforeStepHookList.get(before) != null) {
+                currentStepOrHookMap.add(before, currentBeforeStepHookList.get(before));
+                currentBeforeStepHookList = Json.object();
             }
             currentStepsList.add(currentStepOrHookMap);
         } else if (event.getTestStep() instanceof HookTestStep) {
@@ -129,12 +132,12 @@ public final class JSONFormatter implements EventListener {
     }
 
     private void handleTestStepFinished(TestStepFinished event) {
-        currentStepOrHookMap.put("match", createMatchMap(event.getTestStep(), event.getResult()));
-        currentStepOrHookMap.put("result", createResultMap(event.getResult()));
+        currentStepOrHookMap.add("match", createMatchMap(event.getTestStep(), event.getResult()));
+        currentStepOrHookMap.add("result", createResultMap(event.getResult()));
     }
 
     private void finishReport() {
-        out.append(featureMaps.toString());
+        out.append(featureMaps.toString(WriterConfig.PRETTY_PRINT));
         out.close();
     }
 
@@ -159,52 +162,57 @@ public final class JSONFormatter implements EventListener {
         for (Tag tag : feature.getTags()) {
             JsonObject t = Json.object();
             t.add("name", tag.getName());
+            t.add("type", "Tag");
+            JsonObject location = Json.object();
+            location.add("line", tag.getLocation().getLine());
+            location.add("column", tag.getLocation().getColumn());
+            t.add("location", location);
             tags.add(t);
         }
         return tags;
     }
 
-    private Map<String, Object> createTestCase(TestCaseStarted event) {
-        Map<String, Object> testCaseMap = new HashMap<>();
+    private JsonObject createTestCase(TestCaseStarted event) {
+        JsonObject testCaseMap = Json.object();
 
-        testCaseMap.put("start_timestamp", getDateTimeFromTimeStamp(event.getInstant()));
+        testCaseMap.add("start_timestamp", getDateTimeFromTimeStamp(event.getInstant()));
 
         TestCase testCase = event.getTestCase();
 
-        testCaseMap.put("name", testCase.getName());
-        testCaseMap.put("line", testCase.getLine());
-        testCaseMap.put("type", "scenario");
+        testCaseMap.add("name", testCase.getName());
+        testCaseMap.add("line", testCase.getLine());
+        testCaseMap.add("type", "scenario");
         TestSourcesModel.AstNode astNode = testSources.getAstNode(currentFeatureFile, testCase.getLine());
         if (astNode != null) {
-            testCaseMap.put("id", TestSourcesModel.calculateId(astNode));
+            testCaseMap.add("id", TestSourcesModel.calculateId(astNode));
             ScenarioDefinition scenarioDefinition = TestSourcesModel.getScenarioDefinition(astNode);
-            testCaseMap.put("keyword", scenarioDefinition.getKeyword());
-            testCaseMap.put("description", scenarioDefinition.getDescription() != null ? scenarioDefinition.getDescription() : "");
+            testCaseMap.add("keyword", scenarioDefinition.getKeyword());
+            testCaseMap.add("description", scenarioDefinition.getDescription() != null ? scenarioDefinition.getDescription() : "");
         }
-        testCaseMap.put("steps", new ArrayList<Map<String, Object>>());
+        testCaseMap.add("steps", Json.array());
         if (!testCase.getTags().isEmpty()) {
-            List<Map<String, Object>> tagList = new ArrayList<>();
+            JsonArray tagList = Json.array();
             for (String tag : testCase.getTags()) {
-                Map<String, Object> tagMap = new HashMap<>();
-                tagMap.put("name", tag);
+                JsonObject tagMap = Json.object();
+                tagMap.add("name", tag);
                 tagList.add(tagMap);
             }
-            testCaseMap.put("tags", tagList);
+            testCaseMap.add("tags", tagList);
         }
         return testCaseMap;
     }
 
-    private Map<String, Object> createBackground(TestCase testCase) {
+    private JsonObject createBackground(TestCase testCase) {
         TestSourcesModel.AstNode astNode = testSources.getAstNode(currentFeatureFile, testCase.getLine());
         if (astNode != null) {
             Background background = TestSourcesModel.getBackgroundForTestCase(astNode);
-            Map<String, Object> testCaseMap = new HashMap<>();
-            testCaseMap.put("name", background.getName());
-            testCaseMap.put("line", background.getLocation().getLine());
-            testCaseMap.put("type", "background");
-            testCaseMap.put("keyword", background.getKeyword());
-            testCaseMap.put("description", background.getDescription() != null ? background.getDescription() : "");
-            testCaseMap.put("steps", new ArrayList<Map<String, Object>>());
+            JsonObject testCaseMap = Json.object();
+            testCaseMap.add("name", background.getName());
+            testCaseMap.add("line", background.getLocation().getLine());
+            testCaseMap.add("type", "background");
+            testCaseMap.add("keyword", background.getKeyword());
+            testCaseMap.add("description", background.getDescription() != null ? background.getDescription() : "");
+            testCaseMap.add("steps", Json.array());
             return testCaseMap;
         }
         return null;
@@ -218,59 +226,65 @@ public final class JSONFormatter implements EventListener {
         return currentElementMap != currentTestCaseMap && !TestSourcesModel.isBackgroundStep(astNode);
     }
 
-    private Map<String, Object> createTestStep(PickleStepTestStep testStep) {
-        Map<String, Object> stepMap = new HashMap<>();
-        stepMap.put("name", testStep.getStepText());
-        stepMap.put("line", testStep.getStepLine());
+    private JsonObject createTestStep(PickleStepTestStep testStep) {
+        JsonObject stepMap = Json.object();
+        stepMap.add("name", testStep.getStepText());
+        stepMap.add("line", testStep.getStepLine());
         TestSourcesModel.AstNode astNode = testSources.getAstNode(currentFeatureFile, testStep.getStepLine());
         StepArgument argument = testStep.getStepArgument();
         if (argument != null) {
             if (argument instanceof DocStringArgument) {
                 DocStringArgument docStringArgument = (DocStringArgument) argument;
-                stepMap.put("doc_string", createDocStringMap(docStringArgument));
+                stepMap.add("doc_string", createDocStringMap(docStringArgument));
             } else if (argument instanceof DataTableArgument) {
                 DataTableArgument dataTableArgument = (DataTableArgument) argument;
-                stepMap.put("rows", createDataTableList(dataTableArgument));
+                stepMap.add("rows", createDataTableList(dataTableArgument));
             }
         }
         if (astNode != null) {
             Step step = (Step) astNode.node;
-            stepMap.put("keyword", step.getKeyword());
+            stepMap.add("keyword", step.getKeyword());
         }
 
         return stepMap;
     }
 
-    private Map<String, Object> createDocStringMap(DocStringArgument docString) {
-        Map<String, Object> docStringMap = new HashMap<>();
-        docStringMap.put("value", docString.getContent());
-        docStringMap.put("line", docString.getLine());
-        docStringMap.put("content_type", docString.getContentType());
+    private JsonObject createDocStringMap(DocStringArgument docString) {
+        JsonObject docStringMap = Json.object();
+        docStringMap.add("value", docString.getContent());
+        docStringMap.add("line", docString.getLine());
+        if (docString.getContentType() != null) {
+            docStringMap.add("content_type", docString.getContentType());
+        }
         return docStringMap;
     }
 
-    private List<Map<String, List<String>>> createDataTableList(DataTableArgument argument) {
-        List<Map<String, List<String>>> rowList = new ArrayList<>();
+    private JsonArray createDataTableList(DataTableArgument argument) {
+        JsonArray rowList = Json.array();
         for (List<String> row : argument.cells()) {
-            Map<String, List<String>> rowMap = new HashMap<>();
-            rowMap.put("cells", new ArrayList<>(row));
+            JsonObject rowMap = Json.object();
+            JsonArray jsonRow = Json.array();
+            for (String r : row) {
+                jsonRow.add(r);
+            }
+            rowMap.add("cells", jsonRow);
             rowList.add(rowMap);
         }
         return rowList;
     }
 
-    private Map<String, Object> createHookStep(HookTestStep hookTestStep) {
-        return new HashMap<>();
+    private JsonObject createHookStep(HookTestStep hookTestStep) {
+        return Json.object();
     }
 
-    private void addHookStepToTestCaseMap(Map<String, Object> currentStepOrHookMap, HookType hookType) {
+    private void addHookStepToTestCaseMap(JsonObject currentStepOrHookMap, HookType hookType) {
         String hookName;
         if (hookType == HookType.AFTER || hookType == HookType.AFTER_STEP)
             hookName = after;
         else
             hookName = before;
 
-        Map<String, Object> mapToAddTo;
+        JsonObject mapToAddTo;
         switch (hookType) {
             case BEFORE:
                 mapToAddTo = currentTestCaseMap;
@@ -282,74 +296,74 @@ public final class JSONFormatter implements EventListener {
                 mapToAddTo = currentBeforeStepHookList;
                 break;
             case AFTER_STEP:
-                mapToAddTo = currentStepsList.get(currentStepsList.size() - 1);
+                mapToAddTo = currentStepsList.get(currentStepsList.size() - 1).asObject();
                 break;
             default:
                 mapToAddTo = currentTestCaseMap;
         }
 
-        if (!mapToAddTo.containsKey(hookName)) {
-            mapToAddTo.put(hookName, new ArrayList<Map<String, Object>>());
+        if (mapToAddTo.get(hookName) == null) {
+            mapToAddTo.add(hookName, Json.array());
         }
-        ((List<Map<String, Object>>) mapToAddTo.get(hookName)).add(currentStepOrHookMap);
+        mapToAddTo.get(hookName).asArray().add(currentStepOrHookMap);
     }
 
     private void addOutputToHookMap(String text) {
-        if (!currentStepOrHookMap.containsKey("output")) {
-            currentStepOrHookMap.put("output", new ArrayList<String>());
+        if (currentStepOrHookMap.get("output") == null) {
+            currentStepOrHookMap.add("output", Json.array());
         }
-        ((List<String>) currentStepOrHookMap.get("output")).add(text);
+        currentStepOrHookMap.get("output").asArray().add(text);
     }
 
     private void addEmbeddingToHookMap(byte[] data, String mimeType, String name) {
-        if (!currentStepOrHookMap.containsKey("embeddings")) {
-            currentStepOrHookMap.put("embeddings", new ArrayList<Map<String, Object>>());
+        if (currentStepOrHookMap.get("embeddings") == null) {
+            currentStepOrHookMap.add("embeddings", Json.array());
         }
-        Map<String, Object> embedMap = createEmbeddingMap(data, mimeType, name);
-        ((List<Map<String, Object>>) currentStepOrHookMap.get("embeddings")).add(embedMap);
+        JsonObject embedMap = createEmbeddingMap(data, mimeType, name);
+        currentStepOrHookMap.get("embeddings").asArray().add(embedMap);
     }
 
-    private Map<String, Object> createEmbeddingMap(byte[] data, String mimeType, String name) {
-        Map<String, Object> embedMap = new HashMap<>();
-        embedMap.put("mime_type", mimeType);
-        embedMap.put("data", Base64.getEncoder().encodeToString(data));
+    private JsonObject createEmbeddingMap(byte[] data, String mimeType, String name) {
+        JsonObject embedMap = Json.object();
+        embedMap.add("mime_type", mimeType);
+        embedMap.add("data", Base64.getEncoder().encodeToString(data));
         if (name != null) {
-            embedMap.put("name", name);
+            embedMap.add("name", name);
         }
         return embedMap;
     }
 
-    private Map<String, Object> createMatchMap(TestStep step, Result result) {
-        Map<String, Object> matchMap = new HashMap<>();
+    private JsonObject createMatchMap(TestStep step, Result result) {
+        JsonObject matchMap = Json.object();
         if (step instanceof PickleStepTestStep) {
             PickleStepTestStep testStep = (PickleStepTestStep) step;
             if (!testStep.getDefinitionArgument().isEmpty()) {
-                List<Map<String, Object>> argumentList = new ArrayList<>();
+                JsonArray argumentList = Json.array();
                 for (Argument argument : testStep.getDefinitionArgument()) {
-                    Map<String, Object> argumentMap = new HashMap<>();
+                    JsonObject argumentMap = Json.object();
                     if (argument.getValue() != null) {
-                        argumentMap.put("val", argument.getValue());
-                        argumentMap.put("offset", argument.getStart());
+                        argumentMap.add("val", argument.getValue());
+                        argumentMap.add("offset", argument.getStart());
                     }
                     argumentList.add(argumentMap);
                 }
-                matchMap.put("arguments", argumentList);
+                matchMap.add("arguments", argumentList);
             }
         }
         if (!result.getStatus().is(Status.UNDEFINED)) {
-            matchMap.put("location", step.getCodeLocation());
+            matchMap.add("location", step.getCodeLocation());
         }
         return matchMap;
     }
 
-    private Map<String, Object> createResultMap(Result result) {
-        Map<String, Object> resultMap = new HashMap<>();
-        resultMap.put("status", result.getStatus().name().toLowerCase(ROOT));
+    private JsonObject createResultMap(Result result) {
+        JsonObject resultMap = Json.object();
+        resultMap.add("status", result.getStatus().name().toLowerCase(ROOT));
         if (result.getError() != null) {
-            resultMap.put("error_message", printStackTrace(result.getError()));
+            resultMap.add("error_message", printStackTrace(result.getError()));
         }
         if (!result.getDuration().isZero()) {
-            resultMap.put("duration", result.getDuration().toNanos());
+            resultMap.add("duration", result.getDuration().toNanos());
         }
         return resultMap;
     }
@@ -358,12 +372,5 @@ public final class JSONFormatter implements EventListener {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
             .withZone(ZoneOffset.UTC);
         return formatter.format(instant);
-    }
-
-    private static String printStackTrace(Throwable error) {
-        StringWriter stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
-        error.printStackTrace(printWriter);
-        return stringWriter.toString();
     }
 }

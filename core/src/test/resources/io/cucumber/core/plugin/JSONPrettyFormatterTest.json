@@ -19,7 +19,8 @@
             "name": "bg_1",
             "keyword": "Given ",
             "line": 4,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -28,7 +29,8 @@
             "name": "bg_2",
             "keyword": "When ",
             "line": 5,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -37,7 +39,8 @@
             "name": "bg_3",
             "keyword": "Then ",
             "line": 6,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "background"
@@ -51,7 +54,9 @@
               "duration": 1234000000,
               "status": "passed"
             },
-            "match": {}
+            "match": {
+              "location": "mocked location"
+            }
           }
         ],
         "description": "",
@@ -66,7 +71,8 @@
             "name": "step_1",
             "keyword": "Given ",
             "line": 9,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -75,7 +81,8 @@
             "name": "step_2",
             "keyword": "When ",
             "line": 10,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -84,7 +91,8 @@
             "name": "step_3",
             "keyword": "Then ",
             "line": 11,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -93,7 +101,8 @@
             "name": "cliché",
             "keyword": "Then ",
             "line": 12,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "scenario"
@@ -111,7 +120,8 @@
             "name": "bg_1",
             "keyword": "Given ",
             "line": 4,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -120,7 +130,8 @@
             "name": "bg_2",
             "keyword": "When ",
             "line": 5,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -129,7 +140,8 @@
             "name": "bg_3",
             "keyword": "Then ",
             "line": 6,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "background"
@@ -143,7 +155,9 @@
               "duration": 1234000000,
               "status": "passed"
             },
-            "match": {}
+            "match": {
+              "location": "mocked location"
+            }
           }
         ],
         "description": "",
@@ -158,7 +172,8 @@
             "name": "so_1 12",
             "keyword": "Given ",
             "line": 15,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -167,7 +182,8 @@
             "name": "so_2 7 cucumbers",
             "keyword": "When ",
             "line": 16,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -176,7 +192,8 @@
             "name": "5 so_3",
             "keyword": "Then ",
             "line": 17,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "scenario"
@@ -194,7 +211,8 @@
             "name": "bg_1",
             "keyword": "Given ",
             "line": 4,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -203,7 +221,8 @@
             "name": "bg_2",
             "keyword": "When ",
             "line": 5,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -212,7 +231,8 @@
             "name": "bg_3",
             "keyword": "Then ",
             "line": 6,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "background"
@@ -226,7 +246,9 @@
               "duration": 1234000000,
               "status": "passed"
             },
-            "match": {}
+            "match": {
+              "location": "mocked location"
+            }
           }
         ],
         "description": "",
@@ -241,7 +263,8 @@
             "name": "so_1 20",
             "keyword": "Given ",
             "line": 15,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -250,7 +273,8 @@
             "name": "so_2 15 cucumbers",
             "keyword": "When ",
             "line": 16,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -259,7 +283,8 @@
             "name": "5 so_3",
             "keyword": "Then ",
             "line": 17,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "scenario"
@@ -277,7 +302,8 @@
             "name": "bg_1",
             "keyword": "Given ",
             "line": 4,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -286,7 +312,8 @@
             "name": "bg_2",
             "keyword": "When ",
             "line": 5,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -295,7 +322,8 @@
             "name": "bg_3",
             "keyword": "Then ",
             "line": 6,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "background"
@@ -309,7 +337,9 @@
               "duration": 1234000000,
               "status": "passed"
             },
-            "match": {}
+            "match": {
+              "location": "mocked location"
+            }
           }
         ],
         "description": "",
@@ -324,7 +354,8 @@
             "name": "a",
             "keyword": "Given ",
             "line": 25,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -333,7 +364,8 @@
             "name": "b",
             "keyword": "Then ",
             "line": 26,
-            "match": {}
+            "match": {
+            }
           },
           {
             "result": {
@@ -342,7 +374,8 @@
             "name": "c",
             "keyword": "When ",
             "line": 27,
-            "match": {}
+            "match": {
+            }
           }
         ],
         "type": "scenario"

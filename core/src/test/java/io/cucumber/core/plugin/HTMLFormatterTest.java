@@ -148,13 +148,13 @@ class HTMLFormatterTest {
                 "  \"description\": \"\"\n" +
                 "});\n", "" +
                 "formatter.scenario({\n" +
-                "  \"keyword\": \"Scenario\",\n" +
                 "  \"name\": \"scenario name\",\n" +
+                "  \"keyword\": \"Scenario\",\n" +
                 "  \"description\": \"\"\n" +
                 "});\n", "" +
                 "formatter.step({\n" +
-                "  \"keyword\": \"Given \",\n" +
-                "  \"name\": \"first step\"\n" +
+                "  \"name\": \"first step\",\n" +
+                "  \"keyword\": \"Given \"\n" +
                 "});\n", "" +
                 "formatter.match({\n" +
                 "  \"location\": \"path/step_definitions.java:3\"\n" +
@@ -163,8 +163,8 @@ class HTMLFormatterTest {
                 "  \"status\": \"passed\"\n" +
                 "});\n", "" +
                 "formatter.step({\n" +
-                "  \"keyword\": \"Then \",\n" +
-                "  \"name\": \"second step\"\n" +
+                "  \"name\": \"second step\",\n" +
+                "  \"keyword\": \"Then \"\n" +
                 "});\n", "" +
                 "formatter.match({\n" +
                 "  \"location\": \"path/step_definitions.java:7\"\n" +

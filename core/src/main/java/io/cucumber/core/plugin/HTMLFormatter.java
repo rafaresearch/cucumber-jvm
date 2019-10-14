@@ -247,8 +247,8 @@ public final class HTMLFormatter implements EventListener {
 
     private JsonObject createScenarioOutline(ScenarioOutline scenarioOutline) {
         JsonObject scenarioOutlineMap = Json.object();
-        scenarioOutlineMap.add("name", scenarioOutline.getName());
         scenarioOutlineMap.add("keyword", scenarioOutline.getKeyword());
+        scenarioOutlineMap.add("name", scenarioOutline.getName());
         scenarioOutlineMap.add("description", scenarioOutline.getDescription() != null ? scenarioOutline.getDescription() : "");
         if (!scenarioOutline.getTags().isEmpty()) {
             scenarioOutlineMap.add("tags", createTagList(scenarioOutline.getTags()));
@@ -259,8 +259,8 @@ public final class HTMLFormatter implements EventListener {
     private void addOutlineStepsToReport(ScenarioOutline scenarioOutline) {
         for (Step step : scenarioOutline.getSteps()) {
             JsonObject stepMap = Json.object();
-            stepMap.add("name", step.getText());
             stepMap.add("keyword", step.getKeyword());
+            stepMap.add("name", step.getText());
             if (step.getArgument() != null) {
                 Node argument = step.getArgument();
                 if (argument instanceof DocString) {
@@ -303,8 +303,8 @@ public final class HTMLFormatter implements EventListener {
 
     private JsonObject createExamples(Examples examples) {
         JsonObject examplesMap = Json.object();
-        examplesMap.add("name", examples.getName());
         examplesMap.add("keyword", examples.getKeyword());
+        examplesMap.add("name", examples.getName());
         examplesMap.add("description", examples.getDescription() != null ? examples.getDescription() : "");
         JsonArray rowList = Json.array();
         rowList.add(createRowMap(examples.getTableHeader()));

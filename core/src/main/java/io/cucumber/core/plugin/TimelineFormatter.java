@@ -3,6 +3,7 @@ package io.cucumber.core.plugin;
 import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.WriterConfig;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.plugin.ConcurrentEventListener;
 import io.cucumber.plugin.event.EventPublisher;
@@ -130,7 +131,7 @@ public final class TimelineFormatter implements ConcurrentEventListener {
 
     private void appendAsJsonToJs(final NiceAppendable out, final String pushTo, final JsonArray content) {
         out.append("CucumberHTML.").append(pushTo).append(".pushArray(");
-        out.append(content.toString());
+        out.append(content.toString(WriterConfig.PRETTY_PRINT));
         out.append(");");
     }
 
@@ -238,7 +239,8 @@ public final class TimelineFormatter implements ConcurrentEventListener {
             item.add("scenario", scenario);
             item.add("start", startTime);
             item.add("end", endTime);
-            item.add("group", content);
+            item.add("group", threadId);
+            item.add("content", content);
             item.add("className", className);
             item.add("tags", tags);
             return item;
